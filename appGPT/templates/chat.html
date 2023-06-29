@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Chat Page</title>
+  <style>
+    /* CSS for chat container */
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      height: 100vh;
+      margin: 0;
+      font-family: Arial;
+      overflow: hidden;
+      padding-bottom: 20px;
+    }
+
+    .chat-container {
+      position: relative;
+      /*
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      */
+      width: 100%;
+
+      margin-right: 20px;
+      padding: 50px;
+      background-color: #F2F2F2;
+      border-radius: 5px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      margin-left:20px;
+      overflow-y: auto;
+    }
+
+    /* CSS for individual chat message */
+    .chat-message {
+      background-color: #DCF8C6;
+      display: block;
+      max-width: 75%;
+      border-radius: 5px;
+      padding: 10px;
+      margin-bottom: 10px;
+      margin-left: 20px;
+      word-wrap: break-word;
+    }
+
+    /* CSS for user chat message */
+    .user-message {
+      background-color: #E2E2E2;
+      max-width: 90%;
+      width: fit-content;
+      clear:both;      
+    }
+    
+    /* CSS for user chat message */
+    .bot-message {
+      align-self: flex-end;
+      background-color: #A2A2A2;
+      margin-top: 10px;
+      margin-bottom: 20px;
+      margin-right:20px;
+      max-width: 80%;
+      float:right;
+      clear: both;
+    }
+
+    /* CSS for fading effect */
+    .fade-out {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 20px;
+      background: linear-gradient(to bottom, rgba(242, 242, 242, 0) 0%, #F2F2F2 100%);
+      pointer-events: none;
+    }
+
+    /* CSS for chat input and send button */
+    .chat-input {
+      display: flex;
+      align-items: center;
+      margin-top: 20px;
+      margin-bottom: 20px;
+      width: 45%;
+    }
+
+    textarea{
+      flex-grow: 1;
+      padding: 10px;
+      border-radius: 5px;
+      font-family: Arial;
+      resize: none;
+      border: 1px solid #CCCCCC;
+    }
+
+    .chat-input input[type="text"] {
+      flex-grow: 1;
+      padding: 10px;
+      border-radius: 5px;
+      border: 1px solid #CCCCCC;
+    }
+
+    .chat-input button {
+      margin-left: 10px;
+      padding: 10px 20px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .full-width{
+      width:100%;
+      background-color: inherit;
+    }
+    .logout-button{
+      background-color: red;
+      color: white;
+      border-radius: 10px;
+      text-decoration: none;
+      padding-left: 15px;
+      padding-right: 15px;
+      padding-bottom: 10px; 
+      padding-top: 10px; 
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 9999;
+    }
+  </style>
+</head>
+<body>
+  <div class="chat-container" id="chat-container">
+    <a href="{% url 'logout' %}" class="logout-button">Logout</a>
+    <div id="chat-messages"></div>
+  </div>
+
+  <div class="chat-input">
+    <textarea id="user-message" placeholder="Type your message" rows="1" wrap="soft"></textarea>
+    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+    <button id="send-button">Send</button>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script>
+    $(document).ready(function() {
+      var chatContainer = $("#chat-container");
+      var chatMessages = $("#chat-messages");
+      
+      var userMessageInput = $("#user-message");
+      var botMessageInput = $(".bot-message");
+      var sendButton = $("#send-button");
+      var currMessages = JSON.parse('{{ messages|escapejs }}');
+      const map1 = new Map(Object.entries(currMessages));
+      const [map_key] = map1.keys();
+
+      const messages = map1.get(map_key);
+
+      for (let i = 0; i < messages.length; i++) {
+        console.log(messages[i][0] == false);
+        console.log(messages[i][0])
+        if (messages[i][0] == false) {          
+	  // false means not bot
+          var userMessage = $('<div class="chat-message user-message"></div>').text(messages[i][1]);
+          chatMessages.append(userMessage);
+	} else {
+          var botMessage = $('<div class="chat-message bot-message"></div>').text(messages[i][1]);
+          chatMessages.append(botMessage);
+        }
+      }
+      
+      function appendUserMessage(message) {
+        var userChatMessage = $('<div class="chat-message user-message">').text(message);
+        chatMessages.append(userChatMessage);
+        chatContainer.scrollTop(chatContainer.prop("scrollHeight"));
+        updateFadingElement();
+      }
+      
+      function appendBotMessage(message) {
+        var botChatMessage = $('<div class="chat-message bot-message"></div>').text(message);
+        chatMessages.append(botChatMessage);
+        chatContainer.scrollTop(chatContainer.prop("scrollHeight"));
+      }
+
+      function updateFadingElement() {
+        var chatContainerHeight = chatContainer.height();
+        var chatMessagesHeight = chatMessages.outerHeight();
+        var fadingElement = $(".fade-out");
+
+        if (chatMessagesHeight > chatContainerHeight) {
+          fadingElement.css("bottom", chatMessagesHeight - chatContainerHeight);
+        } else {
+          fadingElement.css("bottom", 0);
+        }
+      }
+
+      function sendMessage() {
+        var userMessage = userMessageInput.val().trim();
+
+        if (userMessage !== "") {
+          appendUserMessage(userMessage);
+          userMessageInput.val("");
+          // Retrieve CSRF token from the hidden input field
+          var csrfToken = '{{ csrf_token }}';
+          
+          $.ajax({
+                url: '/save_message/',  // URL to your backend view
+                type: 'POST',
+                data: {
+                    'message': userMessage,
+                    'csrfmiddlewaretoken': csrfToken
+                },
+                success: function(response) {
+                    // Handle successful response, if needed
+                    console.log('Message saved successfully');
+                    // Assuming the response contains the AI message
+                    var aiResponse = response.ai_message;
+
+                    // Append the AI response message to the chat messages
+                    appendBotMessage(aiResponse);
+                },
+                error: function(xhr, status, error) {
+                    // Handle error, if needed
+                    console.log('Error saving message:', error);
+                }
+            });
+          
+        }
+      }
+
+      sendButton.click(function() {
+        sendMessage();
+      });
+
+      userMessageInput.keypress(function(event) {
+        if (event.which === 13) {
+          sendMessage();
+          event.preventDefault();
+        }
+      });
+    });
+  </script>
+</body>
+</html>
